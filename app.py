@@ -32,7 +32,8 @@ st.sidebar.markdown("---")
 st.sidebar.subheader("📥 入金（不確実）")
 base_revenue = st.sidebar.number_input("月々のベース売上 (万円)", value=1200, step=50)
 big_hit_revenue = st.sidebar.number_input("大口顧客の入金額 (万円)", value=500, step=50)
-hit_prob = st.sidebar.slider("大口の入金遅延が発生する確率 (%)", 0.0, 20.0, 3.2) / 100
+hit_prob_percent = st.sidebar.slider("大口の入金遅延が発生する確率 (%)", 0, 20, 3) 
+hit_prob = hit_prob_percent / 100
 
 # 出金セクション
 st.sidebar.subheader("📤 出金（確実な義務）")
