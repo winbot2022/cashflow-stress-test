@@ -1,11 +1,26 @@
 import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
+import os
 
 st.set_page_config(page_title="資金繰り・サバイバル診断", layout="wide")
 
+# --- フォント設定（文字化け対策） ---
+FONT_PATH = 'NotoSansJP-Regular.ttf'
+if os.path.exists(FONT_PATH):
+    # フォントプロパティを設定
+    fp = fm.FontProperties(fname=FONT_PATH)
+    # matplotlibのデフォルトフォントとして登録
+    plt.rcParams['font.family'] = fp.get_name()
+    # グラフ描画時に明示的にフォントを指定するための変数
+    font_prop = fp
+else:
+    st.error(f"フォントファイル {FONT_PATH} が見つかりません。")
+    font_prop = None
+
 st.title("🛡️ 資金繰り・ストレステスト（入出金分離モデル）")
-st.write("「平均値」の安心を捨て、31分の1の「死にたくじ」を可視化する。")
+st.write("「平均値」の安心を捨て、不運の重なりを可視化する。")
 
 # --- サイドバー：経営パラメータの入力 ---
 st.sidebar.header("📊 経営データの入力")
@@ -25,70 +40,72 @@ fixed_cost = st.sidebar.number_input("月々の固定費：人件費・家賃等
 variable_cost_rate = st.sidebar.slider("変動費率：仕入・外注費等 (%)", 0, 100, 30) / 100
 
 st.sidebar.markdown("---")
-trials = st.sidebar.select_slider("シミュレーション回数", options=[100, 1000, 10000], value=10000)
+trials = st.sidebar.select_slider("シミュレーション回数", options=[100, 1000, 10000], value=1000)
 
-# --- シミュレーション・ロジック ---
-months = 12
-results = []
+# --- テスト実行ボタン ---
+execute_button = st.sidebar.button("🚀 ストレステストを実行")
 
-for _ in range(trials):
-    cash = initial_cash
-    cash_flow = [cash]
-    for m in range(months):
-        # 1. 入金の計算
-        # ベース売上にも少しの変動（標準偏差10%と仮定）を与える
-        current_rev = np.random.normal(base_revenue, base_revenue * 0.1)
-        
-        # 大口顧客の遅延抽選
-        if np.random.rand() < hit_prob:
-            # 今月は入金ゼロ（来月以降に回る想定だが、単月ストレスとして0で計算）
-            pass 
-        else:
-            current_rev += big_hit_revenue
+# --- シミュレーション実行 ---
+if execute_button:
+    months = 12
+    results = []
+
+    for _ in range(trials):
+        cash = initial_cash
+        cash_flow = [cash]
+        for m in range(months):
+            # 1. 入金の計算（10%のゆらぎ）
+            current_rev = np.random.normal(base_revenue, base_revenue * 0.1)
+            if np.random.rand() < hit_prob:
+                pass 
+            else:
+                current_rev += big_hit_revenue
+                
+            # 2. 出金の計算
+            current_out = fixed_cost + (base_revenue + big_hit_revenue) * variable_cost_rate
             
-        # 2. 出金の計算
-        # 固定費は必ず発生、変動費は「本来の売上予定」に対して発生すると仮定
-        current_out = fixed_cost + (base_revenue + big_hit_revenue) * variable_cost_rate
+            cash += (current_rev - current_out)
+            cash_flow.append(cash)
+        results.append(cash_flow)
+
+    results = np.array(results)
+
+    # --- 結果の表示 ---
+    col1, col2 = st.columns([2, 1])
+
+    with col1:
+        fig, ax = plt.subplots(figsize=(10, 6))
+        ax.plot(results.T, color='gray', alpha=0.01) 
+        ax.plot(np.median(results, axis=0), color='#1f77b4', linewidth=3, label='通常シナリオ（中央値）')
+        ax.plot(np.percentile(results, 5, axis=0), color='#d62728', linestyle='--', linewidth=2, label='最悪のシナリオ（下位5%）')
         
-        cash += (current_rev - current_out)
-        cash_flow.append(cash)
-    results.append(cash_flow)
+        ax.axhline(0, color='black', linewidth=1.5)
+        
+        # グラフタイトルの日本語対応
+        ax.set_title("12ヶ月間の資金推移シミュレーション", fontproperties=font_prop, fontsize=16)
+        ax.set_xlabel("月数 (Month)", fontproperties=font_prop)
+        ax.set_ylabel("現預金残高 (万円)", fontproperties=font_prop)
+        ax.legend(prop=font_prop)
+        
+        st.pyplot(fig)
 
-results = np.array(results)
+    with col2:
+        short_count = sum(1 for trial in results if any(cash < 0 for cash in trial))
+        short_rate = short_count / trials * 100
+        
+        st.metric("1年以内の資金ショート確率", f"{short_rate:.2f} %")
+        
+        if short_rate > 5:
+            st.error("⚠️ 危険水域です。固定費の削減か、融資枠の確保を推奨します。")
+        elif short_rate > 1:
+            st.warning("🟡 注意が必要です。大口依存からの脱却を検討しましょう。")
+        else:
+            st.success("🟢 比較的安全です。ただし、突発的なリスクへの備えは忘れずに。")
 
-# --- 結果の表示 ---
-col1, col2 = st.columns([2, 1])
-
-with col1:
-    fig, ax = plt.subplots(figsize=(10, 6))
-    # 全試行を薄く描画
-    ax.plot(results.T, color='gray', alpha=0.01) 
-    # 中央値
-    ax.plot(np.median(results, axis=0), color='#1f77b4', linewidth=3, label='通常シナリオ（中央値）')
-    # ワースト5%
-    ax.plot(np.percentile(results, 5, axis=0), color='#d62728', linestyle='--', linewidth=2, label='最悪のシナリオ（下位5%）')
-    
-    ax.axhline(0, color='black', linewidth=1.5)
-    ax.set_xlabel("月数 (Month)")
-    ax.set_ylabel("現預金残高 (万円)")
-    ax.legend()
-    st.pyplot(fig)
-
-with col2:
-    short_count = sum(1 for trial in results if any(cash < 0 for cash in trial))
-    short_rate = short_count / trials * 100
-    
-    st.metric("1年以内の資金ショート確率", f"{short_rate:.2f} %")
-    
-    if short_rate > 5:
-        st.error("⚠️ 危険水域です。固定費の削減か、融資枠の確保を推奨します。")
-    elif short_rate > 1:
-        st.warning("🟡 注意が必要です。大口依存からの脱却を検討しましょう。")
-    else:
-        st.success("🟢 比較的安全です。ただし、突発的なリスクへの備えは忘れずに。")
-
-    st.info(f"""
-    **診断メモ:**
-    - 月間平均支出：約 {fixed_cost + (base_revenue + big_hit_revenue) * variable_cost_rate:.0f} 万円
-    - 入金遅延時の単月赤字：約 {big_hit_revenue:.0f} 万円のマイナスインパクト
-    """)
+        st.info(f"""
+        **診断メモ:**
+        - 月間平均支出：約 {fixed_cost + (base_revenue + big_hit_revenue) * variable_cost_rate:.0f} 万円
+        - 入金遅延時の単月赤字：約 {big_hit_revenue:.0f} 万円のマイナスインパクト
+        """)
+else:
+    st.info("サイドバーの「🚀 ストレステストを実行」ボタンを押すと、1万回のシミュレーションが開始されます。")
