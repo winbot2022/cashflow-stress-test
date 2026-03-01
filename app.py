@@ -34,6 +34,10 @@ base_revenue = st.sidebar.number_input("月々のベース売上 (万円)", valu
 big_hit_revenue = st.sidebar.number_input("大口顧客の入金額 (万円)", value=500, step=50)
 hit_prob_percent = st.sidebar.slider("大口の入金遅延が発生する確率 (%)", 0, 20, 3) 
 hit_prob = hit_prob_percent / 100
+# スライダーのすぐ下に表示するヒント
+if hit_prob_percent > 0:
+    years_once = 100 / hit_prob_percent
+    st.sidebar.caption(f"💡 およそ {years_once:.1/f} ヶ月に1回の頻度で発生する計算です。")
 
 # 出金セクション
 st.sidebar.subheader("📤 出金（確実な義務）")
