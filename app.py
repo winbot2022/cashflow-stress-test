@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 import os
 
+np.random.seed(42)
 # --- ページ設定 ---
 st.set_page_config(page_title="資金繰り・実務リスクモデル", layout="wide")
 
