@@ -84,9 +84,9 @@ if execute_button:
     with col1:
         fig, ax = plt.subplots(figsize=(10, 6))
         is_short = np.any(results < 0, axis=1)
-        ax.plot(results[~is_short].T, color='gray', alpha=0.01)
+        ax.plot(results[~is_short].T, color='gray', alpha=0.02)
         if np.any(is_short):
-            ax.plot(results[is_short].T, color='#d62728', alpha=0.05)
+            ax.plot(results[is_short].T, color='#d62728', alpha=0.03, linewidth=0.5)
         ax.plot(np.median(results, axis=0), color='#1f77b4', linewidth=4, label='通常シナリオ')
         ax.axhline(0, color='black', linewidth=2)
         ax.set_title("10社分散リスク・シミュレーション", fontproperties=font_prop)
