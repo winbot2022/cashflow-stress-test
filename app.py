@@ -54,19 +54,27 @@ if execute_button:
         cash = initial_cash
         cash_flow = [cash]
         for m in range(months):
-            # 1. 入金の計算（10%のゆらぎ）
-            current_rev = np.random.normal(base_revenue, base_revenue * 0.1)
-            if np.random.rand() < hit_prob:
-                pass 
-            else:
-                current_rev += big_hit_revenue
-                
-            # 2. 出金の計算
-            current_out = fixed_cost + (base_revenue + big_hit_revenue) * variable_cost_rate
+            # --- 修正後の計算ロジック ---
+        
+            # 1. ベース売上の確定（ゆらぎ10%）
+            current_base_rev = np.random.normal(base_revenue, base_revenue * 0.1)
             
-            cash += (current_rev - current_out)
+            # 2. 大口入金の確定（抽選）
+            is_delayed = np.random.rand() < hit_prob
+            current_big_hit_rev = 0 if is_delayed else big_hit_revenue
+            
+            # 3. 合計入金の計算
+            total_revenue = current_base_rev + current_big_hit_rev
+            
+            # 4. 出金の計算
+            # 変動費は「実際に発生したベース売上」＋「大口（入金に関わらず仕事はしたと仮定）」に対して発生
+            current_var_cost = (current_base_rev + big_hit_revenue) * variable_cost_rate
+            total_out = fixed_cost + current_var_cost
+            
+            # 5. 残高更新
+            cash += (total_revenue - total_out)
             cash_flow.append(cash)
-        results.append(cash_flow)
+            results.append(cash_flow)
 
     results = np.array(results)
 
