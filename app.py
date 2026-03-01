@@ -36,7 +36,7 @@ hit_prob_percent = st.sidebar.slider("大口の入金遅延が発生する確率
 hit_prob = hit_prob_percent / 100
 # スライダーのすぐ下に表示するヒント
 if hit_prob_percent > 0:
-    st.sidebar.caption(f"💡 およそ {100/hit_prob_percent:.1f} ヶ月に1回発生するリスク
+    st.sidebar.caption(f"💡 およそ {100/hit_prob_percent:.1f} ヶ月に1回発生するリスクです。")
 
 # 出金セクション
 st.sidebar.subheader("📤 出金（確実な義務）")
