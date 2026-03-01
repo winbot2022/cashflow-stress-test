@@ -5,7 +5,7 @@ import matplotlib.font_manager as fm
 import os
 
 # --- ページ設定 ---
-st.set_page_config(page_title="資金繰り・厳格リスクモデル", layout="wide")
+st.set_page_config(page_title="資金繰り・実務リスクモデル", layout="wide")
 
 # --- フォント設定 ---
 FONT_PATH = 'NotoSansJP-Regular.ttf'
@@ -16,8 +16,8 @@ if os.path.exists(FONT_PATH):
 else:
     font_prop = None
 
-st.title("🛡️ 資金繰り・厳格リスクシミュレーター")
-st.write("「支払い後の瞬間」を判定。最大顧客の初月遅延を逃さない厳格モデル。")
+st.title("🛡️ 資金繰り・実務リスクシミュレーター")
+st.write("「月末時点」の残高で判定。10%の遅延リスクが牙を剥く実務モデル。")
 
 # --- サイドバー設定 ---
 st.sidebar.header("📊 経営データの入力")
@@ -38,7 +38,7 @@ fixed_cost = st.sidebar.number_input("月々の固定費 (万円)", value=1000, 
 variable_cost_rate = st.sidebar.slider("変動費率 (%)", 0, 100, 40) / 100
 
 trials = st.sidebar.select_slider("シミュレーション回数", options=[100, 1000, 10000], value=1000)
-execute_button = st.sidebar.button("🚀 厳格テストを実行")
+execute_button = st.sidebar.button("🚀 ストレステストを実行")
 
 if execute_button:
     months = 12
@@ -50,18 +50,11 @@ if execute_button:
         cash_flow = [cash]
         
         for m in range(months):
-            # A. 当月の「発生主義」売上
+            # A. 当月の売上と出金
             current_sales = np.random.normal(total_revenue, total_revenue * 0.05) * weights
-            
-            # B. 出金の計算（義務的支払）
             outflow = fixed_cost + (current_sales.sum() * variable_cost_rate)
             
-            # C. 先に「支払い」を行う（ここでショート判定）
-            cash -= outflow
-            # 支払い直後の残高を記録（入金前に判定するため）
-            interim_cash = cash 
-            
-            # D. 回収の計算
+            # B. 回収の計算
             inflow = 0
             for i in range(num_clients):
                 if np.random.rand() < (hit_prob / 100):
@@ -74,10 +67,9 @@ if execute_button:
                 inflow += recovered
                 pending_pools[i] -= recovered
             
-            # E. 入金を加算
-            cash += inflow
-            # グラフ用には入金後の残高を記録（ただし判定には interim_cash を使用）
-            cash_flow.append(cash if interim_cash >= 0 else interim_cash)
+            # C. 月末時点での残高更新（入金と出金を合算して判定）
+            cash = cash - outflow + inflow
+            cash_flow.append(cash)
 
         results.append(cash_flow)
 
@@ -87,7 +79,7 @@ if execute_button:
     col1, col2 = st.columns([2, 1])
     with col1:
         fig, ax = plt.subplots(figsize=(10, 6))
-        # 厳格判定：一度でも「支払い後」が0未満になったら赤
+        # 月末残高が一度でも0未満になったらショート
         is_short = np.any(results < 0, axis=1)
         
         ax.plot(results[~is_short].T, color='gray', alpha=0.02)
@@ -96,14 +88,15 @@ if execute_button:
         
         ax.plot(np.median(results, axis=0), color='#1f77b4', linewidth=4, label='通常シナリオ')
         ax.axhline(0, color='black', linewidth=2.5)
-        ax.set_title("厳格キャッシュフロー判定（支払い先行モデル）", fontproperties=font_prop)
+        ax.set_title("実務キャッシュフロー判定（月末残高モデル）", fontproperties=font_prop)
         st.pyplot(fig)
 
     with col2:
         short_rate = (np.sum(is_short) / trials) * 100
         st.metric("1年以内の資金ショート確率", f"{short_rate:.2f} %")
-        st.write(f"最大顧客の月商: {total_revenue * weights[0]:.1f}万円")
-        st.write(f"月間固定費+変動費: {fixed_cost + total_revenue*variable_cost_rate:.1f}万円")
         
-        if initial_cash < (fixed_cost + total_revenue * variable_cost_rate):
-            st.error("🚨 警告：初期キャッシュが「一ヶ月の総支出」を下回っています。初月に最大顧客が遅延すれば100%ショートします。")
+        # 簡易診断メモ
+        st.write(f"最大顧客(A社)の売上: {total_revenue * weights[0]:.1f}万円")
+        if (initial_cash + total_revenue - (fixed_cost + total_revenue * variable_cost_rate)) > 0:
+            if (initial_cash + total_revenue*(1-weights[0]) - (fixed_cost + total_revenue * variable_cost_rate)) < 0:
+                st.warning("💡 A社が遅延した瞬間にショートする、典型的な『大口依存型』のリスク構造です。")
